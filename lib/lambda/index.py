@@ -1,42 +1,59 @@
+import os
+import boto3
 import json
-import requests
-from bs4 import BeautifulSoup
+import re
 
-def handler(event, context):
-    url = "https://aws.amazon.com/jp/blogs/aws/"
+from linebot import LineBotApi
+from linebot.models import TextSendMessage
 
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
+LINE_CHANNEL_ACCESS_TOKEN = os.environ['LINE_CHANNEL_ACCESS_TOKEN']
+CHANNEL_SECRET = os.environ['LINE_CHANNEL_SECRET']
+AGENT_ID = os.environ['AGENT_ID']
+AGENT_ALIAS_ID = os.environ['AGENT_ALIAS_ID']
+LINE_BOT_API = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 
-    articles = soup.select("article.blog-post")[:1]
+def chat(message, session_id):
 
-    result = []
-    for article in articles:
-        title = article.select_one("h2.blog-post-title").text.strip()
-        link = article.select_one("h2.blog-post-title a")["href"]
-        date = article.select_one("footer.blog-post-meta").text.strip()
-
-        result .append({"title": title, "link": link, "date": date})
-
-    contents = json.dumps(result, ensure_ascii=False)
-
-    response_body = {"application/json": {"body": contents}}
-    action_response = {
-        "actionGroup": event.get("actionGroup", "default_action_group"),
-        "apiPath": event.get("apiPath", "/default_path"),
-        "httpMethod": event.get("httpMethod", "GET"),
-        "httpStatusCode": 200,
-        "responseBody": response_body,
-    }
-    api_response = {"messageVersion": "1.0", "response": action_response}
-
-    return api_response
+    # Agent用のSDKが用意されている
+    client = boto3.client("bedrock-agent-runtime")
     
-    # API Gatewayから呼び出す場合のレスポンス
-    # return {
-    #     "statusCode": 200,
-    #     "body": contents,
-    #     "headers": {
-    #         "Content-Type": "application/json"
-    #     }
-    # }
+    # Agentを実行する
+    response = client.invoke_agent(
+        inputText=message,
+        agentId=AGENT_ID,    # AgentのID
+        agentAliasId=AGENT_ALIAS_ID,  # AgentのaliasのID
+        sessionId=session_id,   # セッションのID
+        enableTrace=False
+    )
+    
+    # Agentの実行結果を取得し、返す
+    results = response['completion']
+    for result in results:        
+        if 'chunk' in result:
+            data = result['chunk']['bytes'].decode("utf-8")
+    print(data)
+    return data
+
+def lambda_handler(event, context):
+    body = json.loads(event['body'])
+
+    if len(body['events']) > 0:
+        if body['events'][0]['type'] == 'message':
+            if body['events'][0]['message']['type'] == 'text':
+                # Messaging APIのイベントからメッセージとuser idを取り出す
+                message = body['events'][0]['message']['text']
+                user = body['events'][0]['source']['userId']
+
+                # Agentを実行し、回答を取得
+                resp = chat(message, user)
+
+                # Agentの回答を、返答の形でユーザーに返す
+                LINE_BOT_API.reply_message(
+                    body['events'][0]['replyToken'],
+                    messages
+                )
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps('Success!'),
+    }
