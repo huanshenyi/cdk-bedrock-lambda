@@ -13,11 +13,11 @@ export class AgentLambdaStack extends cdk.Stack {
 
     const layer = new lambda_python.PythonLayerVersion(this, "MyLayer", {
       entry: path.join(__dirname, "lambda-layer"),
-      compatibleRuntimes: [lambda.Runtime.PYTHON_3_9],
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
     });
     const myFunction = new lambda_python.PythonFunction(this, "MyFunction", {
       entry: path.join(__dirname, "lambda"),
-      runtime: lambda.Runtime.PYTHON_3_9,
+      runtime: lambda.Runtime.PYTHON_3_12,
       timeout: Duration.seconds(10),
       layers: [layer],
     });
