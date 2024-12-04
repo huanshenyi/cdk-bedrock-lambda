@@ -6,7 +6,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
 import { Duration } from "aws-cdk-lib";
-import { ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import { ServicePrincipal } from "aws-cdk-lib/aws-iam";
 
 export class AgentLambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -18,32 +18,27 @@ export class AgentLambdaStack extends cdk.Stack {
     });
     const myFunction = new lambda.Function(this, "sAgentFunctions", {
       runtime: lambda.Runtime.PYTHON_3_9,
-      handler: "index.handler",
+      handler: "index.lambda_handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "lambda")),
       layers: [layer],
       timeout: Duration.seconds(10),
       environment: {
         LINE_CHANNEL_ACCESS_TOKEN: "",
         LINE_CHANNEL_SECRET: "",
-        AGENT_ID: "ACLX2IUSVN",
-        AGENT_ALIAS_ID: "M92G85MO7I"
-      }
-    })
-    // const myFunction = new lambda_python.PythonFunction(this, "AgentFunction", {
-    //   entry: path.join(__dirname, "lambda"),
-    //   runtime: lambda.Runtime.PYTHON_3_9,
-    //   timeout: Duration.seconds(10),
-    //   layers: [layer],
-    //   environment: {
-    //     LINE_CHANNEL_ACCESS_TOKEN: "",
-    //     LINE_CHANNEL_SECRET: "",
-    //     AGENT_ID: "ACLX2IUSVN",
-    //     AGENT_ALIAS_ID: "M92G85MO7I"
-    //   }
-    // });
+        AGENT_ID: "",
+        AGENT_ALIAS_ID: "",
+      },
+    });
 
-    myFunction.grantInvoke(
-      new ServicePrincipal('bedrock.amazonaws.com')
+    myFunction.grantInvoke(new ServicePrincipal("bedrock.amazonaws.com"));
+    myFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:*"], // 必要なアクション
+        resources: [
+          "*", // エージェントarn
+        ],
+      })
     );
 
     myFunction.addPermission("APIGatewayInvoke", {
@@ -60,7 +55,7 @@ export class AgentLambdaStack extends cdk.Stack {
 
     const searchResource = api.root.addResource("search");
     searchResource.addMethod(
-      "GET",
+      "POST",
       new apigateway.LambdaIntegration(myFunction)
     );
   }

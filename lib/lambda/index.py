@@ -14,15 +14,14 @@ LINE_BOT_API = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 
 def chat(message, session_id):
 
-    # Agent用のSDKが用意されている
     client = boto3.client("bedrock-agent-runtime")
     
     # Agentを実行する
     response = client.invoke_agent(
         inputText=message,
-        agentId=AGENT_ID,    # AgentのID
-        agentAliasId=AGENT_ALIAS_ID,  # AgentのaliasのID
-        sessionId=session_id,   # セッションのID
+        agentId=AGENT_ID,
+        agentAliasId=AGENT_ALIAS_ID,
+        sessionId=session_id,
         enableTrace=False
     )
     
@@ -31,7 +30,6 @@ def chat(message, session_id):
     for result in results:        
         if 'chunk' in result:
             data = result['chunk']['bytes'].decode("utf-8")
-    print(data)
     return data
 
 def lambda_handler(event, context):
@@ -40,14 +38,12 @@ def lambda_handler(event, context):
     if len(body['events']) > 0:
         if body['events'][0]['type'] == 'message':
             if body['events'][0]['message']['type'] == 'text':
-                # Messaging APIのイベントからメッセージとuser idを取り出す
                 message = body['events'][0]['message']['text']
                 user = body['events'][0]['source']['userId']
 
-                # Agentを実行し、回答を取得
                 resp = chat(message, user)
-
                 # Agentの回答を、返答の形でユーザーに返す
+                messages = [TextSendMessage(text=resp)]
                 LINE_BOT_API.reply_message(
                     body['events'][0]['replyToken'],
                     messages
